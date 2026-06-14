@@ -1,6 +1,10 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+load_dotenv()
 
 from src.api.routes import router
 from src.database.seed import seed_database
@@ -24,6 +28,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(router, prefix="/api/v1")
+    app.mount("/", StaticFiles(directory="src/static", html=True), name="static")
     return app
 
 

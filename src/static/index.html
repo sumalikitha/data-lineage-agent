@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Lineage Agent</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 14px 24px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    header span { font-size: 13px; color: #64748b; }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    aside {
+      width: 260px;
+      flex-shrink: 0;
+      background: #1a1d27;
+      border-right: 1px solid #2d3148;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 14px 16px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    #run-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .run-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 0.15s;
+    }
+    .run-item:hover { background: #222640; }
+    .run-item.active { border-left-color: #6366f1; background: #1e2138; }
+
+    .run-id-short { font-size: 12px; font-weight: 500; color: #a5b4fc; }
+    .run-meta { font-size: 11px; color: #475569; margin-top: 2px; }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-pending   { background: #1e293b; color: #94a3b8; }
+    .badge-running   { background: #1e3a5f; color: #60a5fa; }
+    .badge-completed { background: #14432a; color: #4ade80; }
+    .badge-failed    { background: #3b1111; color: #f87171; }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      padding: 12px 20px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    button {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    #btn-analyze {
+      background: #6366f1;
+      color: #fff;
+    }
+    #btn-analyze:hover:not(:disabled) { background: #4f52d6; }
+
+    #btn-fit {
+      background: #222640;
+      color: #a5b4fc;
+      border: 1px solid #2d3148;
+    }
+    #btn-fit:hover:not(:disabled) { background: #2a2f56; }
+
+    #status-msg {
+      font-size: 12px;
+      color: #64748b;
+      margin-left: auto;
+    }
+
+    #cy-container {
+      flex: 1;
+      position: relative;
+      background: #0f1117;
+    }
+
+    #cy { width: 100%; height: 100%; }
+
+    #empty-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #334155;
+      pointer-events: none;
+    }
+    #empty-state svg { opacity: 0.3; }
+    #empty-state p { font-size: 14px; }
+
+    /* ── Summary panel ── */
+    #summary-panel {
+      border-top: 1px solid #2d3148;
+      background: #1a1d27;
+      max-height: 160px;
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: none;
+    }
+
+    #summary-panel .panel-label {
+      padding: 8px 20px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+    }
+
+    #summary-text {
+      padding: 0 20px 14px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #94a3b8;
+      white-space: pre-wrap;
+    }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed;
+      background: #1e2138;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.6;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      max-width: 260px;
+      color: #e2e8f0;
+    }
+    #tooltip strong { color: #a5b4fc; display: block; margin-bottom: 4px; font-size: 13px; }
+    #tooltip .tip-row { color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Data Lineage Agent</h1>
+  <span>Banking DB · Claude claude-sonnet-4-6</span>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="sidebar-header">Run History</div>
+    <div id="run-list"></div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <button id="btn-analyze">Run Analysis</button>
+      <button id="btn-fit" disabled>Fit Graph</button>
+      <span id="status-msg">No analysis run yet</span>
+    </div>
+
+    <div id="cy-container">
+      <div id="cy"></div>
+      <div id="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+        </svg>
+        <p>Click "Run Analysis" to discover data lineage</p>
+      </div>
+    </div>
+
+    <div id="summary-panel">
+      <div class="panel-label">Agent Summary</div>
+      <div id="summary-text"></div>
+    </div>
+  </main>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+  let cy = null;
+  let pollTimer = null;
+  let activeRunId = null;
+
+  const btnAnalyze = document.getElementById('btn-analyze');
+  const btnFit     = document.getElementById('btn-fit');
+  const statusMsg  = document.getElementById('status-msg');
+  const runList    = document.getElementById('run-list');
+  const emptyState = document.getElementById('empty-state');
+  const summaryPanel = document.getElementById('summary-panel');
+  const summaryText  = document.getElementById('summary-text');
+  const tooltip      = document.getElementById('tooltip');
+
+  // ── Cytoscape setup ────────────────────────────────────────────────────────
+  function initCy() {
+    cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [],
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': '#1e2138',
+            'border-color': '#6366f1',
+            'border-width': 2,
+            'label': 'data(label)',
+            'color': '#e2e8f0',
+            'font-size': '13px',
+            'font-weight': '600',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'shape': 'roundrectangle',
+            'width': 'label',
+            'height': 'label',
+            'padding': '14px',
+          }
+        },
+        {
+          selector: 'node:selected',
+          style: {
+            'background-color': '#2d3163',
+            'border-color': '#a5b4fc',
+            'border-width': 3,
+          }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 2,
+            'line-color': '#334155',
+            'target-arrow-color': '#6366f1',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'font-size': '10px',
+            'color': '#64748b',
+            'text-background-color': '#0f1117',
+            'text-background-opacity': 1,
+            'text-background-padding': '3px',
+          }
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'line-color': '#6366f1',
+            'width': 3,
+          }
+        },
+      ],
+      layout: { name: 'grid' },
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+    });
+
+    cy.on('mouseover', 'node', e => showNodeTooltip(e));
+    cy.on('mouseout',  'node', () => { tooltip.style.display = 'none'; });
+    cy.on('mouseover', 'edge', e => showEdgeTooltip(e));
+    cy.on('mouseout',  'edge', () => { tooltip.style.display = 'none'; });
+  }
+
+  // ── Tooltip helpers ────────────────────────────────────────────────────────
+  function positionTooltip(e) {
+    const pos = e.originalEvent;
+    tooltip.style.left = (pos.clientX + 14) + 'px';
+    tooltip.style.top  = (pos.clientY + 14) + 'px';
+  }
+
+  function showNodeTooltip(e) {
+    const d = e.target.data();
+    tooltip.innerHTML = `
+      <strong>${d.id}</strong>
+      <span class="tip-row">Columns: ${(d.columns || []).join(', ') || '—'}</span><br>
+      <span class="tip-row">Rows: ${d.row_count ?? '—'}</span><br>
+      <span class="tip-row">${d.description || ''}</span>
+    `;
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  }
+
+  function showEdgeTooltip(e) {
+    const d = e.target.data();
+    tooltip.innerHTML = `
+      <strong>${d.source} → ${d.target}</strong>
+      <span class="tip-row">Type: ${d.rel_type || '—'}</span><br>
+      <span class="tip-row">Join: ${d.label || '—'}</span>
+    `;
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  }
+
+  // ── Render graph from report ───────────────────────────────────────────────
+  function renderGraph(report) {
+    if (!cy) initCy();
+
+    cy.elements().remove();
+    emptyState.style.display = 'none';
+
+    const elements = [];
+
+    for (const n of (report.nodes || [])) {
+      elements.push({
+        data: {
+          id: n.table_name,
+          label: n.table_name,
+          columns: n.columns,
+          row_count: n.row_count,
+          description: n.description,
+        }
+      });
+    }
+
+    for (const edge of (report.edges || [])) {
+      elements.push({
+        data: {
+          id: `${edge.source_table}__${edge.target_table}__${Math.random().toString(36).slice(2,6)}`,
+          source: edge.source_table,
+          target: edge.target_table,
+          label: (edge.join_columns || []).join(', '),
+          rel_type: edge.relationship_type,
+        }
+      });
+    }
+
+    cy.add(elements);
+    cy.layout({ name: 'cose', animate: true, animationDuration: 600, nodeRepulsion: 8000, padding: 60 }).run();
+    btnFit.disabled = false;
+
+    if (report.summary) {
+      summaryText.textContent = report.summary;
+      summaryPanel.style.display = 'block';
+    }
+  }
+
+  // ── API calls ──────────────────────────────────────────────────────────────
+  async function fetchReport(runId) {
+    const res = await fetch(`/api/v1/report/${runId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async function fetchRuns() {
+    const res = await fetch('/api/v1/runs');
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async function startAnalysis() {
+    const res = await fetch('/api/v1/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // ── Polling ────────────────────────────────────────────────────────────────
+  function pollRun(runId) {
+    clearInterval(pollTimer);
+    activeRunId = runId;
+
+    pollTimer = setInterval(async () => {
+      try {
+        const report = await fetchReport(runId);
+        refreshRunList();
+
+        if (report.status === 'completed') {
+          clearInterval(pollTimer);
+          setStatus('completed', report);
+          renderGraph(report);
+        } else if (report.status === 'failed') {
+          clearInterval(pollTimer);
+          setStatus('failed', report);
+          btnAnalyze.disabled = false;
+        } else {
+          setStatus(report.status, report);
+        }
+      } catch (err) {
+        clearInterval(pollTimer);
+        statusMsg.textContent = `Error: ${err.message}`;
+        btnAnalyze.disabled = false;
+      }
+    }, 2000);
+  }
+
+  function setStatus(status, report) {
+    const labels = {
+      pending:   'Queued — waiting to start…',
+      running:   'Agent is analyzing the database…',
+      completed: `Done — ${(report.nodes || []).length} tables · ${(report.edges || []).length} relationships`,
+      failed:    `Failed: ${report.error || 'unknown error'}`,
+    };
+    statusMsg.textContent = labels[status] || status;
+  }
+
+  // ── Run list sidebar ───────────────────────────────────────────────────────
+  function shortId(id) { return id.slice(0, 8) + '…'; }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function refreshRunList() {
+    const runs = await fetchRuns();
+    runList.innerHTML = '';
+
+    if (runs.length === 0) {
+      runList.innerHTML = '<div style="padding:14px 16px;font-size:12px;color:#475569;">No runs yet</div>';
+      return;
+    }
+
+    for (const run of [...runs].reverse()) {
+      const item = document.createElement('div');
+      item.className = 'run-item' + (run.run_id === activeRunId ? ' active' : '');
+      item.innerHTML = `
+        <div class="run-id-short">${shortId(run.run_id)}</div>
+        <div class="run-meta">
+          <span class="badge badge-${run.status}">${run.status}</span>
+          &nbsp;${formatTime(run.created_at)}
+        </div>
+      `;
+      item.addEventListener('click', () => loadRun(run.run_id));
+      runList.appendChild(item);
+    }
+  }
+
+  async function loadRun(runId) {
+    clearInterval(pollTimer);
+    activeRunId = runId;
+    refreshRunList();
+
+    try {
+      const report = await fetchReport(runId);
+      setStatus(report.status, report);
+
+      if (report.status === 'completed') {
+        renderGraph(report);
+        btnAnalyze.disabled = false;
+      } else if (report.status === 'running' || report.status === 'pending') {
+        btnAnalyze.disabled = true;
+        pollRun(runId);
+      } else {
+        btnAnalyze.disabled = false;
+      }
+    } catch (err) {
+      statusMsg.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // ── Event listeners ────────────────────────────────────────────────────────
+  btnAnalyze.addEventListener('click', async () => {
+    btnAnalyze.disabled = true;
+    statusMsg.textContent = 'Starting analysis…';
+    try {
+      const resp = await startAnalysis();
+      await refreshRunList();
+      pollRun(resp.run_id);
+    } catch (err) {
+      statusMsg.textContent = `Error: ${err.message}`;
+      btnAnalyze.disabled = false;
+    }
+  });
+
+  btnFit.addEventListener('click', () => cy && cy.fit(undefined, 40));
+
+  // move tooltip with mouse
+  document.addEventListener('mousemove', e => {
+    if (tooltip.style.display === 'block') {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top  = (e.clientY + 14) + 'px';
+    }
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  initCy();
+  refreshRunList();
+</script>
+</body>
+</html>
