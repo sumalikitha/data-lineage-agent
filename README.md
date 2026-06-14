@@ -26,10 +26,23 @@ Swagger UI: `http://localhost:8000/docs`
 ## Running Locally (without Docker)
 
 ```bash
+# 1. Install dependencies
 pip install -e ".[dev]"
-export ANTHROPIC_API_KEY=your-key
+
+# 2. Set your API key
+cp .env.example .env
+# Edit .env and set ANTHROPIC_API_KEY=your-actual-key
+
+# 3. Start the server
 uvicorn src.api.app:app --reload
 ```
+
+The service is now live at `http://localhost:8000`.
+
+| URL | Description |
+|---|---|
+| `http://localhost:8000` | Lineage graph UI — trigger analysis and view results visually |
+| `http://localhost:8000/docs` | Swagger UI — interactive API reference |
 
 ---
 
