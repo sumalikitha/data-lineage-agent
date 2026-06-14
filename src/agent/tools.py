@@ -1,4 +1,3 @@
-import json
 from typing import Any
 
 import aiosqlite
@@ -252,9 +251,7 @@ TOOL_DEFINITIONS: list[dict] = [
         "description": "Returns the total number of rows in a table.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "table_name": {"type": "string", "description": "Name of the table"}
-            },
+            "properties": {"table_name": {"type": "string", "description": "Name of the table"}},
             "required": ["table_name"],
         },
     },

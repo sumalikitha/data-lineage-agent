@@ -1,6 +1,3 @@
-import os
-
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -21,14 +18,13 @@ async def client(db_path, monkeypatch):
 
     # Reset the singleton service so it picks up the patched env vars
     import src.api.deps as deps
+
     deps._service = None
 
     from src.api.app import create_app
 
     app = create_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     deps._service = None

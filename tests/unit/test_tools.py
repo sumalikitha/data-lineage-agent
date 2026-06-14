@@ -1,17 +1,15 @@
-import pytest
-
 from src.agent.tools import (
+    finalize_report,
     find_column_references,
     get_foreign_keys,
+    get_lineage_graph,
     get_row_count,
     get_sample_data,
     get_table_schema,
-    get_lineage_graph,
     init_lineage_graph,
     list_tables,
     save_lineage_edge,
     save_lineage_node,
-    finalize_report,
 )
 
 

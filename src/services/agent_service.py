@@ -39,9 +39,7 @@ class LineageAgentService:
             report.summary = graph.get("summary")
             report.status = RunStatus.completed
             report.completed_at = datetime.utcnow()
-            log.info(
-                f"Analysis complete: {len(report.nodes)} nodes, {len(report.edges)} edges"
-            )
+            log.info(f"Analysis complete: {len(report.nodes)} nodes, {len(report.edges)} edges")
 
         except Exception as exc:
             report.status = RunStatus.failed

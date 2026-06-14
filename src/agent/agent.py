@@ -4,7 +4,12 @@ from typing import Any
 import anthropic
 
 from src.agent.prompts import SYSTEM_PROMPT
-from src.agent.tools import TOOL_DEFINITIONS, get_lineage_graph, handle_tool_call, init_lineage_graph
+from src.agent.tools import (
+    TOOL_DEFINITIONS,
+    get_lineage_graph,
+    handle_tool_call,
+    init_lineage_graph,
+)
 
 
 class LineageAgent:
@@ -100,6 +105,11 @@ class LineageAgent:
 
 
 class _noop_logger:
-    def info(self, *_): pass
-    def error(self, *_): pass
-    def warning(self, *_): pass
+    def info(self, *_):
+        pass
+
+    def error(self, *_):
+        pass
+
+    def warning(self, *_):
+        pass

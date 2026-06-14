@@ -1,10 +1,7 @@
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from src.agent.agent import LineageAgent
-from src.agent.tools import init_lineage_graph, _lineage_graphs
 
 
 def _make_tool_use_block(id_: str, name: str, input_: dict):
