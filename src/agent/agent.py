@@ -43,7 +43,7 @@ class LineageAgent:
                 max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 tools=TOOL_DEFINITIONS,
-                messages=messages,
+                messages=list(messages),  # snapshot so caller can't see subsequent mutations
             )
 
             # Append the full assistant response (including tool_use blocks)
