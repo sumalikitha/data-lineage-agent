@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-load_dotenv()
-
 from src.api.routes import router
 from src.database.seed import seed_database
 from src.utils.logger import app_logger
@@ -21,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    load_dotenv()
     app = FastAPI(
         title="Data Lineage Agent",
         description="LLM-powered agent that autonomously discovers and documents data lineage",
